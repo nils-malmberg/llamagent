@@ -119,23 +119,44 @@ description: Écrire des tests pytest pour un module Python.
 
 ```
 mini-agent/
-├── src/mini_agent/
-│   ├── config.py      # configuration et limites des garde-fous
-│   ├── llm.py         # appels à Ollama (/api/chat, /api/tags)
-│   ├── tools.py       # outils et registre
-│   ├── context.py     # gestion du contexte d'une session
-│   ├── guards.py      # garde-fous
-│   ├── history.py     # gestion des sauvegardes des sessions
-│   ├── agent.py       # boucle agentique et prompt système
-│   ├── session.py     # état de la conversation, fichiers tagués
-│   ├── commands.py    # commandes /...
-│   └── cli.py         # point d'entrée `mini-agent`
-├── prompts/           # prompt système
-│   ├── AGENT.md       # rôle de mini-agent
-│   ├── COMPACT.md     # compactage des sessions
-├── skills/            # skills globales
-├── demo/stats.py      # script buggé pour la démo
-└── tests/             # pytest, Ollama remplacé par un faux modèle
+├── pyproject.toml          # uv + hatchling, une seule dépendance : requests
+├── .python-version         # 3.11
+├── README.md
+├── steps/                  # étapes 1 à 4 : un script autonome par étape
+│   ├── step1_hello.py
+│   ├── step2_chat.py
+│   ├── step3_tool.py
+│   └── step4_loop.py
+├── src/mini_agent/         # étapes 5 à 8 : la version modulaire
+│   ├── __init__.py
+│   ├── config.py           # configuration et limites
+│   ├── llm.py              # appel à Ollama
+│   ├── tools.py            # outils + registre
+│   ├── guards.py           # garde-fous
+│   ├── agent.py            # boucle agentique
+│   ├── session.py          # état de la conversation (partie 2)
+│   ├── history.py          # sauvegarde des conversations (partie 2)
+│   ├── context.py          # mesure et compactage du contexte (partie 2)
+│   ├── commands.py         # commandes /... (partie 2)
+│   ├── ui.py               # interface : couleurs, logo, animation (partie 2)
+│   └── cli.py              # point d'entrée `mini-agent`
+├── prompts/
+│   ├── AGENT.md            # prompt système
+│   └── COMPACT.md          # consignes de résumé (partie 2)
+├── skills/                 # skills en Markdown
+│   ├── corriger-un-bug.md
+│   └── ecrire-tests-pytest.md
+├── demo/stats.py           # script buggé pour la démo
+└── tests/                  # pytest, Ollama remplacé par un faux modèle
+    ├── test_config.py
+    ├── test_guards.py
+    ├── test_tools.py
+    ├── test_agent.py
+    ├── test_session.py
+    ├── test_commands.py
+    ├── test_history.py
+    ├── test_context.py
+    └── test_ui.py
 ```
 
 ## Tests

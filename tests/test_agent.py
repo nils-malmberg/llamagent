@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mini_agent.agent import build_system_prompt, run_turn
+from mini_agent.agent import build_system_prompt, describe_harness, run_turn
 from mini_agent.tools import ToolContext
 
 
@@ -109,3 +109,12 @@ def test_vrai_prompt_et_vraies_skills():
     assert set(skills) == {"corriger-un-bug", "ecrire-tests-pytest"}
     prompt = build_system_prompt(template, Path("/projet"), skills)
     assert "corriger-un-bug" in prompt and "{skills}" not in prompt
+
+
+def test_ce_que_fait_le_harness(ctx):
+    assert "confirmation" in describe_harness("edit_file", {"path": "a.py"}, ctx, repeated=False)
+    assert "confirmation" in describe_harness("run_command", {"command": "python a.py"}, ctx, repeated=False)
+    ctx.allowed_commands = ["python a.py"]
+    assert "sans confirmation" in describe_harness("run_command", {"command": "python a.py"}, ctx, repeated=False)
+    assert "inconnu" in describe_harness("search_web", {}, ctx, repeated=False)
+    assert "pas exécuté" in describe_harness("read_file", {"path": "a.py"}, ctx, repeated=True)

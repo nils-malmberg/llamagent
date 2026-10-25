@@ -7,6 +7,7 @@ commandes peuvent modifier.
 """
 
 import re
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
@@ -83,6 +84,9 @@ class Session:
     context_estimated: bool = False  # vrai si context_tokens est une estimation (étape 16)
     session_id: str | None = None  # nom du fichier de sauvegarde (étape 15)
     title: str = ""  # titre de la sauvegarde : début de la première demande
+    # Ce qui s'affiche pendant l'attente du modèle (étape 17) : rien par défaut,
+    # l'animation de ui.thinking dans la vraie interface.
+    waiting: Callable = nullcontext
 
     def __post_init__(self) -> None:
         self.reset()
@@ -118,7 +122,8 @@ class Session:
     def chat(self, messages: list[dict], tools: list[dict]) -> dict:
         """La fonction `chat` donnée à la boucle. Elle lit self.config à chaque
         appel : un /model ou un /temp s'applique dès l'appel suivant."""
-        data = llm.chat_full(self.config, messages, tools)
+        with self.waiting():
+            data = llm.chat_full(self.config, messages, tools)
         # Tokens lus + tokens générés : la place occupée dans le contexte.
         self.context_tokens = data.get("prompt_eval_count", 0) + data.get("eval_count", 0)
         self.context_estimated = False

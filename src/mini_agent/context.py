@@ -95,7 +95,8 @@ def compact(session) -> str:
     text = truncate(transcript(conversation), session.config.num_ctx * CHARS_PER_TOKEN // 2)
     instructions = (PROMPTS_DIR / "COMPACT.md").read_text(encoding="utf-8")
     # Appel sans outils : on veut du texte, pas des tool calls.
-    reply = llm.chat(session.config, [{"role": "system", "content": instructions}, {"role": "user", "content": text}])
+    with session.waiting():
+        reply = llm.chat(session.config, [{"role": "system", "content": instructions}, {"role": "user", "content": text}])
     summary = (reply.get("content") or "").strip()
     session.remember_title()  # avant que la première demande ne disparaisse
     session.messages = [
