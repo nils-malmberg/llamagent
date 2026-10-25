@@ -1,66 +1,87 @@
-"""Point d'entrée de la ligne de commande : `uv run mini-agent`.
+"""Point d'entrée de la ligne de commande : `mini-agent`.
 
-    uv run mini-agent                      # mode conversation
-    uv run mini-agent "corrige le bug..."  # une seule demande, puis on quitte
+    mini-agent                          # mode conversation dans le dossier courant
+    mini-agent "corrige le bug..."      # une seule demande, puis on quitte
+    mini-agent -m qwen3.5:9b -t 0.5     # options : voir mini-agent --help
 
-C'est ici qu'on assemble le harness : configuration, prompt système,
-outils, garde-fous, puis la boucle agentique.
+C'est ici qu'on assemble le harness : configuration, session (prompt
+système, outils, garde-fous), commandes /..., puis la boucle agentique.
 """
 
+import argparse
 import os
-import sys
 
 import requests
 
-from mini_agent import llm
-from mini_agent.agent import build_system_prompt, run_turn
-from mini_agent.config import PROMPTS_DIR, SKILLS_DIR, load_config
+from mini_agent.agent import GREY, RED, YELLOW, color
+from mini_agent.commands import execute_command
+from mini_agent.config import load_config
 from mini_agent.guards import ask_confirmation
-from mini_agent.tools import ToolContext, available_skills
+from mini_agent.session import Session, create_session, find_mentions, load_project_instructions
 
 
-def ask_agent(chat, messages: list[dict], ctx: ToolContext, text: str) -> None:
-    """Ajoute une demande à la conversation, lance la boucle, affiche la réponse."""
-    messages.append({"role": "user", "content": text})
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog="mini-agent", description="Un agent de code minimal autour d'Ollama.")
+    parser.add_argument("demande", nargs="*", help="demande à traiter avant de quitter (sinon : mode conversation)")
+    parser.add_argument("-m", "--model", help="modèle Ollama, ex. qwen3.5:4b")
+    parser.add_argument("-t", "--temperature", type=float, help="température, ex. 0.2")
+    parser.add_argument("--num-ctx", type=int, help="taille du contexte en tokens, ex. 8192")
+    parser.add_argument("--url", help="adresse du serveur Ollama")
+    return parser.parse_args(argv)
+
+
+def context_status(session: Session) -> str:
+    """Une ligne qui montre la place occupée dans le contexte du modèle."""
+    used, size = session.context_tokens, session.config.num_ctx
+    text = f"[contexte : {used} / {size} tokens]"
+    if used >= size:
+        return color(text + " plein : Ollama a coupé le début de la conversation, tape /clear", RED)
+    if used >= 0.75 * size:
+        return color(text + " presque plein", YELLOW)
+    return color(text, GREY)
+
+
+def handle_request(session: Session, text: str) -> None:
+    """Envoie une demande à l'agent et affiche sa réponse."""
+    for path in find_mentions(text):
+        print(color(f"   + fichier joint : {path}", GREY))
     try:
-        answer = run_turn(chat, messages, ctx)
+        answer = session.ask(text)
     except requests.RequestException as error:
         print(f"Erreur de communication avec Ollama : {error}")
         return
     print(f"\nagent > {answer}")
+    print(context_status(session))
 
 
 def main() -> None:
     if os.name == "nt":
         os.system("")  # active les couleurs ANSI dans les anciennes consoles Windows
 
-    config = load_config()
-    template = (PROMPTS_DIR / "AGENT.md").read_text(encoding="utf-8")
-    skills = available_skills(SKILLS_DIR)
-    ctx = ToolContext(workdir=config.workdir, skills_dir=SKILLS_DIR, confirm=ask_confirmation)
-
-    # La conversation commence toujours par le prompt système.
-    messages = [{"role": "system", "content": build_system_prompt(template, config.workdir, skills)}]
-
-    def chat(msgs: list[dict], tools: list[dict]) -> dict:
-        return llm.chat(config, msgs, tools)
+    args = parse_args()
+    config = load_config({"model": args.model, "temperature": args.temperature, "num_ctx": args.num_ctx, "url": args.url})
+    session = create_session(config, confirm=ask_confirmation)
 
     print(f"mini-agent — modèle {config.model} sur {config.ollama_url}")
     print(f"Dossier de travail : {config.workdir}")
+    if load_project_instructions(config.workdir):
+        print("Instructions du projet : AGENTS.md")
 
     try:
         # Mode « une seule demande » : la demande est passée en argument.
-        if len(sys.argv) > 1:
-            ask_agent(chat, messages, ctx, " ".join(sys.argv[1:]))
+        if args.demande:
+            handle_request(session, " ".join(args.demande))
             return
 
-        print("Tape ta demande (/quit pour sortir).")
+        print("Tape ta demande, ou /help pour les commandes.")
         while True:
             text = input("\nvous > ").strip()
             if text in ("/quit", "/exit"):
                 break
-            if text:
-                ask_agent(chat, messages, ctx, text)
+            if text.startswith("/"):
+                print(execute_command(session, text))
+            elif text:
+                handle_request(session, text)
     except (KeyboardInterrupt, EOFError):
         print("\nAu revoir.")
 

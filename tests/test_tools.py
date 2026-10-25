@@ -12,7 +12,7 @@ def ctx(tmp_path):
     (tmp_path / "skills" / "demo.md").write_text(
         "---\ndescription: Une skill de test.\n---\n# Demo\nFais ceci.\n", encoding="utf-8"
     )
-    return ToolContext(workdir=tmp_path, skills_dir=tmp_path / "skills", confirm=lambda question: True)
+    return ToolContext(workdir=tmp_path, skills_dirs=[tmp_path / "skills"], confirm=lambda question: True)
 
 
 def test_cinq_outils_maximum():
@@ -49,18 +49,41 @@ def test_list_files_dossier_inexistant(ctx):
         assert "n'est pas un dossier existant" in execute_tool("list_files", {"path": path}, ctx)
 
 
-def test_write_file_avec_confirmation(ctx):
+def test_edit_file_cree_un_fichier(ctx):
     questions = []
     ctx.confirm = lambda question: questions.append(question) or True
-    resultat = execute_tool("write_file", {"path": "dir/b.txt", "content": "ligne 1\nligne 2\n"}, ctx)
-    assert resultat.startswith("Fichier dir/b.txt écrit")
+    resultat = execute_tool("edit_file", {"path": "dir/b.txt", "old_text": "", "new_text": "ligne 1\nligne 2\n"}, ctx)
+    assert resultat == "Fichier dir/b.txt créé."
     assert (ctx.workdir / "dir" / "b.txt").read_text(encoding="utf-8") == "ligne 1\nligne 2\n"
     assert "+ligne 1" in questions[0]  # l'utilisateur a vu le diff
 
 
-def test_write_file_refuse_par_l_utilisateur(ctx):
+def test_edit_file_remplace_un_passage(ctx):
+    (ctx.workdir / "c.py").write_text("a = 1\nb = 2\nc = 3\n", encoding="utf-8")
+    resultat = execute_tool("edit_file", {"path": "c.py", "old_text": "b = 2", "new_text": "b = 20"}, ctx)
+    assert resultat == "Fichier c.py modifié."
+    assert (ctx.workdir / "c.py").read_text(encoding="utf-8") == "a = 1\nb = 20\nc = 3\n"
+
+
+def test_edit_file_passage_introuvable(ctx):
+    (ctx.workdir / "c.py").write_text("a = 1\n", encoding="utf-8")
+    assert "old_text introuvable" in execute_tool("edit_file", {"path": "c.py", "old_text": "z = 9", "new_text": ""}, ctx)
+
+
+def test_edit_file_passage_ambigu(ctx):
+    (ctx.workdir / "c.py").write_text("x = 0\nx = 0\n", encoding="utf-8")
+    assert "apparaît 2 fois" in execute_tool("edit_file", {"path": "c.py", "old_text": "x = 0", "new_text": "x = 1"}, ctx)
+
+
+def test_edit_file_ne_recree_pas_un_fichier_existant(ctx):
+    (ctx.workdir / "c.py").write_text("a = 1\n", encoding="utf-8")
+    assert "existe déjà" in execute_tool("edit_file", {"path": "c.py", "old_text": "", "new_text": "b = 2"}, ctx)
+    assert (ctx.workdir / "c.py").read_text(encoding="utf-8") == "a = 1\n"
+
+
+def test_edit_file_refuse_par_l_utilisateur(ctx):
     ctx.confirm = lambda question: False
-    resultat = execute_tool("write_file", {"path": "b.txt", "content": "x"}, ctx)
+    resultat = execute_tool("edit_file", {"path": "b.txt", "old_text": "", "new_text": "x"}, ctx)
     assert resultat.startswith("Refusé")
     assert not (ctx.workdir / "b.txt").exists()
 
@@ -69,6 +92,12 @@ def test_run_command(ctx):
     resultat = execute_tool("run_command", {"command": 'python -c "print(\'bonjour é\')"'}, ctx)
     assert "code de sortie : 0" in resultat
     assert "bonjour é" in resultat
+
+
+def test_run_command_autorisee_sans_confirmation(ctx):
+    ctx.confirm = lambda question: pytest.fail("aucune question ne devait être posée")
+    ctx.allowed_commands = ["python -c"]
+    assert "code de sortie : 0" in execute_tool("run_command", {"command": 'python -c "print(1)"'}, ctx)
 
 
 def test_run_command_refusee(ctx):
@@ -90,7 +119,16 @@ def test_run_command_sans_clavier(ctx):
 
 def test_load_skill(ctx):
     assert "Fais ceci." in execute_tool("load_skill", {"name": "demo"}, ctx)
-    assert available_skills(ctx.skills_dir) == {"demo": "Une skill de test."}
+    assert available_skills(ctx.skills_dirs) == {"demo": "Une skill de test."}
+
+
+def test_skill_du_projet_remplace_la_skill_globale(ctx):
+    projet = ctx.workdir / ".mini-agent" / "skills"
+    projet.mkdir(parents=True)
+    (projet / "demo.md").write_text("---\ndescription: Version du projet.\n---\nFais cela.\n", encoding="utf-8")
+    ctx.skills_dirs = [ctx.workdir / "skills", projet]
+    assert available_skills(ctx.skills_dirs) == {"demo": "Version du projet."}
+    assert "Fais cela." in execute_tool("load_skill", {"name": "demo"}, ctx)
 
 
 def test_load_skill_inconnue(ctx):

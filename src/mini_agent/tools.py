@@ -12,12 +12,12 @@ import difflib
 import json
 import os
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
 from mini_agent.config import COMMAND_TIMEOUT
-from mini_agent.guards import GuardError, safe_path
+from mini_agent.guards import GuardError, is_allowed_command, safe_path
 
 # Dossiers jamais listés : sans intérêt pour le modèle et souvent énormes.
 IGNORED_DIRS = {"__pycache__", "node_modules"}
@@ -29,9 +29,11 @@ class ToolContext:
     """Ce dont les outils ont besoin pour travailler, fourni par le harness."""
 
     workdir: Path  # dossier de travail : les outils ne sortent pas d'ici
-    skills_dir: Path  # dossier des skills (fichiers Markdown)
+    skills_dirs: list[Path]  # dossiers des skills, du plus général au plus précis
     confirm: Callable[[str], bool]  # pose une question [o/N] à l'utilisateur
     command_timeout: int = COMMAND_TIMEOUT
+    # Commandes lancées sans confirmation (étape 14), modifiable avec /allow.
+    allowed_commands: list[str] = field(default_factory=list)
 
 
 # ─────────────────────────── Les outils ───────────────────────────
@@ -68,10 +70,28 @@ def list_files(ctx: ToolContext, path: str = ".") -> str:
     return "\n".join(files)
 
 
-def write_file(ctx: ToolContext, path: str, content: str) -> str:
-    """Remplace (ou crée) un fichier, après confirmation de l'utilisateur."""
+def edit_file(ctx: ToolContext, path: str, old_text: str, new_text: str) -> str:
+    """Remplace un passage exact d'un fichier, ou crée un fichier si old_text est vide.
+
+    Le modèle n'envoie que le passage modifié, pas tout le fichier : c'est
+    beaucoup moins de contexte consommé, et le reste du fichier est intact.
+    """
     target = safe_path(ctx.workdir, path)
-    old = target.read_text(encoding="utf-8") if target.exists() else ""
+    if old_text == "":
+        if target.exists():
+            return f"Erreur : {path} existe déjà. Pour le modifier, donne dans old_text le passage exact à remplacer."
+        old, content = "", new_text
+    else:
+        if not target.is_file():
+            return f"Erreur : fichier introuvable : {path}. Pour créer un fichier, laisse old_text vide."
+        old = target.read_text(encoding="utf-8")
+        count = old.count(old_text)
+        if count == 0:
+            return f"Erreur : old_text introuvable dans {path}. Relis le fichier avec read_file et copie le passage exactement."
+        if count > 1:
+            return f"Erreur : old_text apparaît {count} fois dans {path}. Ajoute des lignes autour pour qu'il soit unique."
+        content = old.replace(old_text, new_text, 1)
+
     # On montre à l'utilisateur exactement ce qui va changer.
     diff = "".join(
         difflib.unified_diff(
@@ -85,12 +105,13 @@ def write_file(ctx: ToolContext, path: str, content: str) -> str:
         return "Refusé par l'utilisateur : le fichier n'a pas été modifié."
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
-    return f"Fichier {path} écrit ({len(content.splitlines())} lignes)."
+    return f"Fichier {path} {'créé' if old_text == '' else 'modifié'}."
 
 
 def run_command(ctx: ToolContext, command: str) -> str:
     """Lance une commande shell dans le dossier de travail, après confirmation."""
-    if not ctx.confirm(f"Exécuter : {command}"):
+    # Les commandes de la liste autorisée passent sans question (étape 14).
+    if not is_allowed_command(command, ctx.allowed_commands) and not ctx.confirm(f"Exécuter : {command}"):
         return "Refusé par l'utilisateur : la commande n'a pas été exécutée."
     # Force Python (s'il est lancé par la commande) à écrire en UTF-8,
     # sinon Windows utilise cp1252 et les accents deviennent illisibles.
@@ -117,12 +138,12 @@ def run_command(ctx: ToolContext, command: str) -> str:
 
 
 def load_skill(ctx: ToolContext, name: str) -> str:
-    """Renvoie le contenu d'une skill (fichier Markdown de skills/)."""
-    skills = available_skills(ctx.skills_dir)
+    """Renvoie le contenu d'une skill (fichier Markdown d'un dossier de skills)."""
+    skills = find_skills(ctx.skills_dirs)
     # On vérifie le nom dans la liste : impossible de lire un autre fichier.
     if name not in skills:
         raise GuardError(f"skill inconnue '{name}'. Skills disponibles : {', '.join(skills) or 'aucune'}.")
-    return (ctx.skills_dir / f"{name}.md").read_text(encoding="utf-8")
+    return skills[name].read_text(encoding="utf-8")
 
 
 # ─────────────────────────── Skills ───────────────────────────
@@ -147,11 +168,22 @@ def read_skill_description(path: Path) -> str:
     return "(pas de description)"
 
 
-def available_skills(skills_dir: Path) -> dict[str, str]:
-    """Renvoie {nom de la skill: description} pour chaque fichier .md."""
-    if not skills_dir.is_dir():
-        return {}
-    return {p.stem: read_skill_description(p) for p in sorted(skills_dir.glob("*.md"))}
+def find_skills(skills_dirs: list[Path]) -> dict[str, Path]:
+    """Renvoie {nom de la skill: fichier} pour les fichiers .md de chaque dossier.
+
+    Les dossiers sont lus dans l'ordre : une skill du projet (dernier dossier)
+    remplace une skill globale du même nom.
+    """
+    skills = {}
+    for skills_dir in skills_dirs:
+        if skills_dir.is_dir():
+            skills.update({p.stem: p for p in sorted(skills_dir.glob("*.md"))})
+    return skills
+
+
+def available_skills(skills_dirs: list[Path]) -> dict[str, str]:
+    """Renvoie {nom de la skill: description}, pour le prompt système."""
+    return {name: read_skill_description(path) for name, path in find_skills(skills_dirs).items()}
 
 
 # ─────────────────────────── Le registre ───────────────────────────
@@ -186,13 +218,18 @@ TOOLS: dict[str, tuple[Callable[..., str], dict]] = {
             [],
         ),
     ),
-    "write_file": (
-        write_file,
+    "edit_file": (
+        edit_file,
         schema(
-            "write_file",
-            "Écrit un fichier texte. Remplace TOUT le contenu : donne le fichier complet, pas seulement la partie modifiée.",
-            {"path": PATH_PARAM, "content": {"type": "string", "description": "Contenu complet du fichier."}},
-            ["path", "content"],
+            "edit_file",
+            "Modifie un fichier : remplace old_text (copié exactement depuis read_file, présent une seule fois) par new_text. "
+            "Pour créer un nouveau fichier, laisse old_text vide.",
+            {
+                "path": PATH_PARAM,
+                "old_text": {"type": "string", "description": "Passage exact à remplacer, ou '' pour créer le fichier."},
+                "new_text": {"type": "string", "description": "Nouveau texte."},
+            },
+            ["path", "old_text", "new_text"],
         ),
     ),
     "run_command": (

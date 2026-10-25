@@ -2,7 +2,7 @@
 
 import pytest
 
-from mini_agent.guards import GuardError, ask_confirmation, safe_path, truncate
+from mini_agent.guards import GuardError, ask_confirmation, is_allowed_command, safe_path, truncate
 
 
 def test_chemin_relatif_accepte(tmp_path):
@@ -49,3 +49,21 @@ def test_truncate_garde_debut_et_fin():
 def test_confirmation(monkeypatch, reponse, attendu):
     monkeypatch.setattr("builtins.input", lambda question: reponse)
     assert ask_confirmation("Continuer ?") is attendu
+
+
+@pytest.mark.parametrize(
+    ("commande", "attendu"),
+    [
+        ("python -m pytest", True),
+        ("python -m pytest -q tests", True),
+        ("python -m pytestx", False),  # préfixe d'un autre mot
+        ("git status", True),
+        ("git push", False),
+        ("git status && del *.py", False),  # enchaînement
+        ("git status; rm -rf /", False),
+        ("python -m pytest > sortie.txt", False),  # redirection
+        ("git status | more", False),
+    ],
+)
+def test_commandes_autorisees(commande, attendu):
+    assert is_allowed_command(commande, ["python -m pytest", "git status"]) is attendu

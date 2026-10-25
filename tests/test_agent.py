@@ -31,7 +31,7 @@ def answer(text):
 @pytest.fixture
 def ctx(tmp_path):
     (tmp_path / "notes.txt").write_text("12, 15, 9", encoding="utf-8")
-    return ToolContext(workdir=tmp_path, skills_dir=tmp_path / "skills", confirm=lambda question: True)
+    return ToolContext(workdir=tmp_path, skills_dirs=[tmp_path / "skills"], confirm=lambda question: True)
 
 
 def test_reponse_directe_sans_outil(ctx):
@@ -94,13 +94,18 @@ def test_prompt_systeme_rempli():
     assert "- corriger-un-bug : Méthode." in prompt
 
 
+def test_prompt_systeme_avec_agents_md():
+    prompt = build_system_prompt("{os}{shell}{workdir}{skills}", Path("/projet"), {}, "Utilise des tabulations.")
+    assert prompt.endswith("## Instructions du projet (AGENTS.md)\nUtilise des tabulations.")
+
+
 def test_vrai_prompt_et_vraies_skills():
     """Le fichier prompts/AGENT.md et les skills du dépôt se chargent bien."""
     from mini_agent.config import PROMPTS_DIR, SKILLS_DIR
     from mini_agent.tools import available_skills
 
     template = (PROMPTS_DIR / "AGENT.md").read_text(encoding="utf-8")
-    skills = available_skills(SKILLS_DIR)
+    skills = available_skills([SKILLS_DIR])
     assert set(skills) == {"corriger-un-bug", "ecrire-tests-pytest"}
     prompt = build_system_prompt(template, Path("/projet"), skills)
     assert "corriger-un-bug" in prompt and "{skills}" not in prompt

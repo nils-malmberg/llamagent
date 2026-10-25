@@ -54,17 +54,23 @@ def log_tool_result(result: str) -> None:
 # ─────────────────────────── Prompt système ───────────────────────────
 
 
-def build_system_prompt(template: str, workdir: Path, skills: dict[str, str]) -> str:
-    """Remplit le modèle de prompt (prompts/AGENT.md) avec l'environnement réel."""
+def build_system_prompt(template: str, workdir: Path, skills: dict[str, str], project_instructions: str = "") -> str:
+    """Remplit le modèle de prompt (prompts/AGENT.md) avec l'environnement réel.
+
+    Si le projet a un fichier AGENTS.md (étape 9), son contenu est ajouté à la fin.
+    """
     shell = "cmd.exe" if os.name == "nt" else "/bin/sh"
     skills_text = "\n".join(f"- {name} : {description}" for name, description in skills.items())
     # str.replace plutôt que str.format : le Markdown peut contenir des { }.
-    return (
+    prompt = (
         template.replace("{os}", platform.system())
         .replace("{shell}", shell)
         .replace("{workdir}", str(workdir))
         .replace("{skills}", skills_text or "(aucune)")
     )
+    if project_instructions:
+        prompt += f"\n\n## Instructions du projet (AGENTS.md)\n{project_instructions}"
+    return prompt
 
 
 # ─────────────────────────── La boucle ───────────────────────────

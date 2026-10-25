@@ -44,3 +44,23 @@ def truncate(text: str, max_chars: int) -> str:
     half = max_chars // 2
     removed = len(text) - 2 * half
     return f"{text[:half]}\n[... {removed} caractères tronqués ...]\n{text[-half:]}"
+
+
+# Caractères qui permettent d'enchaîner, de rediriger ou de substituer des
+# commandes (%VAR% est une variable sous Windows, $(...) une sous-commande).
+SHELL_OPERATORS = ("&", "|", ";", ">", "<", "`", "$(", "\n", "%")
+
+
+def is_allowed_command(command: str, allowed: list[str]) -> bool:
+    """Vrai si la commande peut être lancée sans demander confirmation.
+
+    Elle doit commencer par une commande de la liste (« python -m pytest »
+    autorise « python -m pytest -q ») et ne contenir aucun opérateur shell :
+    sinon « git status && del *.py » passerait pour « git status ».
+    C'est un confort, pas une barrière de sécurité : la liste doit rester
+    limitée à des commandes sans danger.
+    """
+    command = command.strip()
+    if any(operator in command for operator in SHELL_OPERATORS):
+        return False
+    return any(command == prefix or command.startswith(prefix + " ") for prefix in allowed)
