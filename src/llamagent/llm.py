@@ -6,7 +6,7 @@ que des listes de messages (des dictionnaires Python).
 
 import requests
 
-from mini_agent.config import REQUEST_TIMEOUT, Config
+from llamagent.config import REQUEST_TIMEOUT, Config
 
 
 def chat_full(config: Config, messages: list[dict], tools: list[dict] | None = None) -> dict:

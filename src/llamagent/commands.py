@@ -10,13 +10,13 @@ from typing import Callable
 
 import requests
 
-from mini_agent import llm
-from mini_agent.context import compact, context_report
-from mini_agent.config import PROJECT_DIR_NAME, PROJECT_INSTRUCTIONS
-from mini_agent.guards import SHELL_OPERATORS, GuardError
-from mini_agent.history import delete_session, find_session, list_sessions, resume_session, save_session
-from mini_agent.session import Session
-from mini_agent.tools import available_skills, load_skill
+from llamagent import llm
+from llamagent.context import compact, context_report
+from llamagent.config import PROJECT_DIR_NAME, PROJECT_INSTRUCTIONS
+from llamagent.guards import SHELL_OPERATORS, GuardError
+from llamagent.history import delete_session, find_session, list_sessions, resume_session, save_session
+from llamagent.session import Session
+from llamagent.tools import available_skills, load_skill
 
 
 def cmd_help(session: Session, arg: str) -> str:
@@ -34,7 +34,7 @@ INIT_FILES = {
 - Conventions de code : ...
 - Fichiers ou dossiers à ne jamais modifier : ...
 """,
-    f"{PROJECT_DIR_NAME}/config.toml": """# Réglages de mini-agent pour ce projet (ils remplacent ~/.mini-agent/config.toml).
+    f"{PROJECT_DIR_NAME}/config.toml": """# Réglages de llamagent pour ce projet (ils remplacent ~/.llamagent/config.toml).
 # Retire le # devant une ligne pour l'activer.
 # model = "qwen3.5:4b"
 # temperature = 0.2
@@ -220,7 +220,7 @@ def cmd_allow(session: Session, arg: str) -> str:
 # nom de la commande -> (fonction, aide affichée par /help)
 COMMANDS: dict[str, tuple[Callable[[Session, str], str], str]] = {
     "/help": (cmd_help, "liste des commandes"),
-    "/init": (cmd_init, "préparer le projet : AGENTS.md et dossier .mini-agent/"),
+    "/init": (cmd_init, "préparer le projet : AGENTS.md et dossier .llamagent/"),
     "/config": (cmd_config, "réglages actuels"),
     "/models": (cmd_models, "modèles installés sur le serveur Ollama"),
     "/model": (cmd_model, "changer de modèle : /model qwen3.5:4b"),

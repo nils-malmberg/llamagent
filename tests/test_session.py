@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from mini_agent import llm
-from mini_agent.config import Config
-from mini_agent.session import create_session, expand_mentions, find_mentions
+from llamagent import llm
+from llamagent.config import Config
+from llamagent.session import create_session, expand_mentions, find_mentions
 
 
 @pytest.fixture
@@ -60,5 +60,5 @@ def test_changer_de_modele_garde_la_conversation(monkeypatch, session):
 
 
 def test_skills_du_projet(tmp_path, session):
-    assert session.ctx.skills_dirs[-1] == tmp_path / ".mini-agent" / "skills"
+    assert session.ctx.skills_dirs[-1] == tmp_path / ".llamagent" / "skills"
     assert session.ctx.skills_dirs[0].name == "skills"

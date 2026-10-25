@@ -1,0 +1,64 @@
+# Publication (étape 18) : quand une étiquette de version (v0.1.0...) est
+# poussée, le paquet est testé, construit et vérifié, publié sur TestPyPI,
+# puis sur PyPI après validation manuelle (environnement « pypi » protégé).
+# Aucun mot de passe ni jeton : PyPI fait confiance à ce workflow précis
+# (Trusted Publishing), qui prouve son identité avec un jeton OIDC de GitHub.
+name: Publication
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    name: Tester et construire
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Tests
+        run: |
+          uv sync --locked
+          uv run pytest -q
+      - name: Construire
+        run: uv build
+      - name: Vérifier le paquet et la version
+        run: python3 scripts/check_package.py "$GITHUB_REF_NAME"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  testpypi:
+    name: Publier sur TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/llamagent
+    permissions:
+      id-token: write # nécessaire au Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  pypi:
+    name: Publier sur PyPI
+    needs: testpypi
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/llamagent
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

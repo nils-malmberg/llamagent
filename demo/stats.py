@@ -1,6 +1,6 @@
 """Petit script de statistiques sur des notes.
 
-Il contient un bug volontaire : c'est la démo de mini-agent.
+Il contient un bug volontaire : c'est la démo de llamagent.
 """
 
 

@@ -1,8 +1,10 @@
 """Tests des outils et du registre (tools.py)."""
 
+import time
+
 import pytest
 
-from mini_agent.tools import TOOLS, ToolContext, available_skills, execute_tool, tool_schemas
+from llamagent.tools import TOOLS, ToolContext, available_skills, execute_tool, tool_schemas
 
 
 @pytest.fixture
@@ -45,7 +47,7 @@ def test_list_files_ignore_dossiers_caches(ctx):
 def test_list_files_dossier_inexistant(ctx):
     # Un dossier absent ne doit pas passer pour un dossier vide.
     (ctx.workdir / "a.txt").write_text("", encoding="utf-8")
-    for path in ("mini-agent", "a.txt"):
+    for path in ("llamagent", "a.txt"):
         assert "n'est pas un dossier existant" in execute_tool("list_files", {"path": path}, ctx)
 
 
@@ -111,6 +113,25 @@ def test_run_command_timeout(ctx):
     assert "dépassé 1 s" in resultat
 
 
+def test_run_command_timeout_arrete_aussi_les_sous_processus(ctx):
+    # parent.py lance enfant.py, qui écrit fini.txt au bout de 3 s. Tuer
+    # seulement le shell ne suffit pas : l'enfant survivrait (et, sous
+    # Windows, on attendrait sa fin car il garde la sortie ouverte).
+    (ctx.workdir / "enfant.py").write_text(
+        "import time, pathlib\ntime.sleep(3)\npathlib.Path('fini.txt').write_text('x')\n", encoding="utf-8"
+    )
+    (ctx.workdir / "parent.py").write_text(
+        "import subprocess, sys\nsubprocess.run([sys.executable, 'enfant.py'])\n", encoding="utf-8"
+    )
+    ctx.command_timeout = 1
+    debut = time.monotonic()
+    resultat = execute_tool("run_command", {"command": "python parent.py"}, ctx)
+    assert "dépassé 1 s" in resultat
+    assert time.monotonic() - debut < 3  # pas d'attente de l'enfant
+    time.sleep(4)
+    assert not (ctx.workdir / "fini.txt").exists()  # l'enfant a bien été arrêté
+
+
 def test_run_command_sans_clavier(ctx):
     # Un programme qui attend une saisie reçoit « fin de fichier » au lieu de bloquer.
     resultat = execute_tool("run_command", {"command": 'python -c "input()"'}, ctx)
@@ -123,7 +144,7 @@ def test_load_skill(ctx):
 
 
 def test_skill_du_projet_remplace_la_skill_globale(ctx):
-    projet = ctx.workdir / ".mini-agent" / "skills"
+    projet = ctx.workdir / ".llamagent" / "skills"
     projet.mkdir(parents=True)
     (projet / "demo.md").write_text("---\ndescription: Version du projet.\n---\nFais cela.\n", encoding="utf-8")
     ctx.skills_dirs = [ctx.workdir / "skills", projet]

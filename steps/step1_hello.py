@@ -14,7 +14,7 @@ import sys
 
 import requests
 
-# Même configuration que src/mini_agent/config.py, recopiée ici pour que
+# Même configuration que src/llamagent/config.py, recopiée ici pour que
 # le script reste autonome (un seul fichier à lire pour comprendre l'étape).
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://192.168.1.76:11434").rstrip("/")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen3.5:4b")

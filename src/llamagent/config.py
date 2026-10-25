@@ -1,9 +1,9 @@
-"""Configuration de mini-agent.
+"""Configuration de llamagent.
 
 Les réglages viennent de plusieurs sources. Chacune remplace la précédente :
-    1. les valeurs par défaut ci-dessous (adaptées à mon NAS) ;
-    2. le fichier global   ~/.mini-agent/config.toml ;
-    3. le fichier du projet .mini-agent/config.toml (dans le dossier de travail) ;
+    1. les valeurs par défaut ci-dessous ;
+    2. le fichier global   ~/.llamagent/config.toml ;
+    3. le fichier du projet .llamagent/config.toml (dans le dossier de travail) ;
     4. les variables d'environnement OLLAMA_URL et OLLAMA_MODEL ;
     5. les options de la ligne de commande (--model, --temperature...).
 Les limites des garde-fous, elles, sont fixées ici.
@@ -14,8 +14,10 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-# Valeurs par défaut : Ollama sur le NAS, modèle 4B qui tient dans 6 Go de VRAM.
-DEFAULT_OLLAMA_URL = "http://192.168.1.76:11434"
+# Valeurs par défaut : Ollama sur la machine elle-même (son adresse standard),
+# et un modèle 4B qui tient dans 6 Go de VRAM. Un Ollama installé ailleurs
+# (sur un NAS par exemple) se règle dans ~/.llamagent/config.toml.
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "qwen3.5:4b"
 
 # Température basse : on veut un agent prévisible, pas créatif.
@@ -34,15 +36,16 @@ MAX_OUTPUT_CHARS = 4000  # taille maximale d'un résultat d'outil (~1000 tokens)
 # Compactage automatique quand le contexte est rempli à 80 % (étape 16).
 COMPACT_THRESHOLD = 0.8
 
-# Dossiers du projet mini-agent : prompts/ et skills/ sont à la racine du
-# dépôt, deux niveaux au-dessus de ce fichier (src/mini_agent/config.py).
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PROMPTS_DIR = PROJECT_ROOT / "prompts"
-SKILLS_DIR = PROJECT_ROOT / "skills"
+# prompts/ et skills/ font partie du paquet (étape 18) : ils sont à côté de
+# ce fichier, dans src/llamagent/, et donc installés avec le code, que
+# llamagent vienne du dépôt ou de PyPI.
+PACKAGE_DIR = Path(__file__).resolve().parent
+PROMPTS_DIR = PACKAGE_DIR / "prompts"
+SKILLS_DIR = PACKAGE_DIR / "skills"
 
-# Réglages propres à chaque projet (étape 9) : un dossier .mini-agent/ dans
+# Réglages propres à chaque projet (étape 9) : un dossier .llamagent/ dans
 # le dossier de travail, et un fichier AGENTS.md à sa racine.
-PROJECT_DIR_NAME = ".mini-agent"
+PROJECT_DIR_NAME = ".llamagent"
 PROJECT_INSTRUCTIONS = "AGENTS.md"
 # Fichier de réglages global de l'utilisateur (étape 12).
 USER_CONFIG = Path.home() / PROJECT_DIR_NAME / "config.toml"
@@ -90,11 +93,11 @@ def read_toml(path: Path) -> dict:
 def load_config(cli_options: dict | None = None) -> Config:
     """Construit la configuration à partir de toutes les sources, dans l'ordre."""
     # Par défaut, l'agent travaille dans le dossier où on le lance.
-    workdir = Path(os.environ.get("MINI_AGENT_WORKDIR", Path.cwd())).resolve()
+    workdir = Path(os.environ.get("LLAMAGENT_WORKDIR", Path.cwd())).resolve()
     # Un dossier de travail absent ferait échouer tous les outils plus tard,
     # avec des erreurs obscures (WinError 267 sous Windows) : on s'arrête net.
     if not workdir.is_dir():
-        raise SystemExit(f"Dossier de travail introuvable : {workdir} (vérifie MINI_AGENT_WORKDIR).")
+        raise SystemExit(f"Dossier de travail introuvable : {workdir} (vérifie LLAMAGENT_WORKDIR).")
 
     settings = {"url": DEFAULT_OLLAMA_URL, "model": DEFAULT_OLLAMA_MODEL, "temperature": TEMPERATURE, "num_ctx": NUM_CTX}
     settings.update(read_toml(USER_CONFIG))

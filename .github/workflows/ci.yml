@@ -1,0 +1,47 @@
+# Intégration continue (étape 18) : à chaque push sur main et à chaque pull
+# request, les tests tournent sous Linux, Windows et macOS, avec Python 3.11
+# à 3.13. Puis le paquet est construit, vérifié et installé comme le ferait
+# un utilisateur.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false # voir tous les systèmes en échec, pas seulement le premier
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Installer les dépendances (versions exactes de uv.lock)
+        run: uv sync --locked
+      - name: Tests
+        run: uv run pytest -q
+
+  package:
+    name: Paquet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Construire
+        run: uv build
+      - name: Vérifier le contenu
+        run: python3 scripts/check_package.py
+      - name: Installer le paquet construit et le lancer
+        run: |
+          uv tool install dist/*.whl
+          LLAMAGENT="$(uv tool dir --bin)/llamagent"
+          "$LLAMAGENT" --version
+          mkdir "$RUNNER_TEMP/projet" && cd "$RUNNER_TEMP/projet"
+          echo /quit | "$LLAMAGENT"

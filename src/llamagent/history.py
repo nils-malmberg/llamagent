@@ -1,6 +1,6 @@
 """Sauvegarde des conversations, pour les reprendre plus tard (étape 15).
 
-Chaque conversation est un fichier JSON dans .mini-agent/sessions/ du
+Chaque conversation est un fichier JSON dans .llamagent/sessions/ du
 projet. Il est réécrit après chaque demande : en cas d'arrêt brutal, on
 perd au plus la demande en cours.
 """
@@ -9,9 +9,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from mini_agent.config import PROJECT_DIR_NAME
-from mini_agent.context import estimate_messages
-from mini_agent.session import Session
+from llamagent.config import PROJECT_DIR_NAME
+from llamagent.context import estimate_messages
+from llamagent.session import Session
 
 def sessions_dir(workdir: Path) -> Path:
     return workdir / PROJECT_DIR_NAME / "sessions"

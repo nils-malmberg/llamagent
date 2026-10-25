@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from mini_agent.agent import build_system_prompt, describe_harness, run_turn
-from mini_agent.tools import ToolContext
+from llamagent.agent import build_system_prompt, describe_harness, run_turn
+from llamagent.tools import ToolContext
 
 
 class FakeChat:
@@ -101,8 +101,8 @@ def test_prompt_systeme_avec_agents_md():
 
 def test_vrai_prompt_et_vraies_skills():
     """Le fichier prompts/AGENT.md et les skills du dépôt se chargent bien."""
-    from mini_agent.config import PROMPTS_DIR, SKILLS_DIR
-    from mini_agent.tools import available_skills
+    from llamagent.config import PROMPTS_DIR, SKILLS_DIR
+    from llamagent.tools import available_skills
 
     template = (PROMPTS_DIR / "AGENT.md").read_text(encoding="utf-8")
     skills = available_skills([SKILLS_DIR])

@@ -1,19 +1,41 @@
 [project]
-name = "mini-agent"
+name = "llamagent"
 version = "0.1.0"
 description = "Un agent de code minimal autour d'Ollama, écrit à la main pour comprendre chaque brique."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Nils Malmberg" }]
 requires-python = ">=3.11"
 dependencies = [
     "requests>=2.34.2",
 ]
+keywords = ["agent", "coding-agent", "llm", "ollama", "tutoriel"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Natural Language :: French",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+]
+
+[project.urls]
+Documentation = "https://nils-malmberg.fr/project8.html"
+Repository = "https://github.com/nils-malmberg/llamagent"
+Issues = "https://github.com/nils-malmberg/llamagent/issues"
 
 [project.scripts]
-mini-agent = "mini_agent.cli:main"
+llamagent = "llamagent.cli:main"
 
 [build-system]
-requires = ["hatchling"]
+# 1.27 : première version qui comprend « license = "MIT" » (PEP 639).
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [dependency-groups]

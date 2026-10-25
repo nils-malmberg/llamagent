@@ -4,7 +4,7 @@ from collections import namedtuple
 
 import pytest
 
-from mini_agent import ui
+from llamagent import ui
 
 Size = namedtuple("Size", "columns lines")
 
@@ -44,7 +44,7 @@ def test_mascotte(couleurs):
 def test_banniere(couleurs):
     banniere = plain(ui.banner([("modèle", "qwen3.5:4b"), ("dossier", "/home/nils/projets/calc")]))
     assert "│o o│   un agent de code minimal autour d’Ollama" in banniere
-    assert "┌─┴─┐   mini-agent" in banniere
+    assert "┌─┴─┐   llamagent" in banniere
     assert "  modèle   qwen3.5:4b" in banniere
 
 

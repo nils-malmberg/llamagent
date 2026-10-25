@@ -1,1 +1,0 @@
-"""mini-agent : un agent de code minimal autour d'Ollama."""

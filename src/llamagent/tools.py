@@ -11,13 +11,14 @@ ligne dans TOOLS. La boucle agentique (agent.py) n'a pas à être modifiée.
 import difflib
 import json
 import os
+import signal
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from mini_agent.config import COMMAND_TIMEOUT
-from mini_agent.guards import GuardError, is_allowed_command, safe_path
+from llamagent.config import COMMAND_TIMEOUT
+from llamagent.guards import GuardError, is_allowed_command, safe_path
 
 # Dossiers jamais listés : sans intérêt pour le modèle et souvent énormes.
 IGNORED_DIRS = {"__pycache__", "node_modules"}
@@ -108,6 +109,24 @@ def edit_file(ctx: ToolContext, path: str, old_text: str, new_text: str) -> str:
     return f"Fichier {path} {'créé' if old_text == '' else 'modifié'}."
 
 
+def kill_process_tree(process: subprocess.Popen) -> None:
+    """Arrête une commande et tous les programmes qu'elle a lancés (étape 18).
+
+    process.kill() n'arrêterait que le shell : les programmes lancés par la
+    commande continueraient de tourner, et sous Windows on attendrait leur fin.
+    """
+    if os.name == "nt":
+        # /T : toute l'arborescence de processus, /F : sans attendre.
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True)
+    else:
+        # La commande a son propre groupe de processus (start_new_session) :
+        # on envoie le signal à tout le groupe.
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass  # tout s'est terminé entre-temps
+
+
 def run_command(ctx: ToolContext, command: str) -> str:
     """Lance une commande shell dans le dossier de travail, après confirmation."""
     # Les commandes de la liste autorisée passent sans question (étape 14).
@@ -116,24 +135,28 @@ def run_command(ctx: ToolContext, command: str) -> str:
     # Force Python (s'il est lancé par la commande) à écrire en UTF-8,
     # sinon Windows utilise cp1252 et les accents deviennent illisibles.
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    process = subprocess.Popen(
+        command,
+        shell=True,  # cmd.exe sous Windows, /bin/sh sous macOS
+        cwd=ctx.workdir,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=subprocess.DEVNULL,  # une commande ne peut pas attendre une saisie au clavier
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        start_new_session=os.name != "nt",  # son propre groupe de processus (Linux, macOS)
+    )
     try:
-        result = subprocess.run(
-            command,
-            shell=True,  # cmd.exe sous Windows, /bin/sh sous macOS
-            cwd=ctx.workdir,
-            capture_output=True,
-            stdin=subprocess.DEVNULL,  # une commande ne peut pas attendre une saisie au clavier
-            encoding="utf-8",
-            errors="replace",
-            timeout=ctx.command_timeout,
-            env=env,
-        )
+        stdout, stderr = process.communicate(timeout=ctx.command_timeout)
     except subprocess.TimeoutExpired:
+        kill_process_tree(process)
+        process.communicate()  # récupère ce qui reste, maintenant que tout est arrêté
         return f"Erreur : la commande a dépassé {ctx.command_timeout} s et a été arrêtée."
     return (
-        f"code de sortie : {result.returncode}\n"
-        f"--- stdout ---\n{result.stdout}\n"
-        f"--- stderr ---\n{result.stderr}"
+        f"code de sortie : {process.returncode}\n"
+        f"--- stdout ---\n{stdout}\n"
+        f"--- stderr ---\n{stderr}"
     )
 
 

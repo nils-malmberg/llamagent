@@ -1,4 +1,4 @@
-"""La boucle agentique : le cœur de mini-agent.
+"""La boucle agentique : le cœur de llamagent.
 
     tant que le modèle demande des outils :
         exécuter chaque outil demandé
@@ -17,10 +17,10 @@ import platform
 from pathlib import Path
 from typing import Callable
 
-from mini_agent import ui
-from mini_agent.config import MAX_OUTPUT_CHARS, MAX_TOURS
-from mini_agent.guards import is_allowed_command, truncate
-from mini_agent.tools import TOOLS, ToolContext, execute_tool, tool_schemas
+from llamagent import ui
+from llamagent.config import MAX_OUTPUT_CHARS, MAX_TOURS
+from llamagent.guards import is_allowed_command, truncate
+from llamagent.tools import TOOLS, ToolContext, execute_tool, tool_schemas
 
 # Une fonction qui reçoit (messages, schémas des outils) et renvoie le message
 # de l'assistant. En vrai : llm.chat. Dans les tests : un faux modèle.

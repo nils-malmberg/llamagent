@@ -2,7 +2,7 @@
 
 import pytest
 
-from mini_agent.guards import GuardError, ask_confirmation, is_allowed_command, safe_path, truncate
+from llamagent.guards import GuardError, ask_confirmation, is_allowed_command, safe_path, truncate
 
 
 def test_chemin_relatif_accepte(tmp_path):

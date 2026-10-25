@@ -1,4 +1,4 @@
-"""L'interface de mini-agent, sans dépendance (étape 17).
+"""L'interface de llamagent, sans dépendance (étape 17).
 
 Deux idées :
   - une mascotte, dessinée pour le projet, accueille l'utilisateur ;
@@ -126,7 +126,7 @@ def banner(rows: list[tuple[str, str]]) -> str:
         + style("@fichier", ORANGE) + style(" joindre un fichier", GREY) + style(dot, GREY)
         + style("/quit", ORANGE) + style(" quitter", GREY)
     )
-    beside = ["", style("mini-agent", BOLD, TEAL), style("un agent de code minimal autour d’Ollama", GREY), "", hint]
+    beside = ["", style("llamagent", BOLD, TEAL), style("un agent de code minimal autour d’Ollama", GREY), "", hint]
     top = [f"{line}   {text}".rstrip() for line, text in zip(mascot(), beside)]
     width = shutil.get_terminal_size().columns - ROLE_WIDTH - 4
     label_width = max(len(label) for label, _ in rows)

@@ -12,17 +12,17 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 
-from mini_agent import llm
-from mini_agent.agent import build_system_prompt, run_turn
-from mini_agent.config import MAX_OUTPUT_CHARS, PROJECT_DIR_NAME, PROJECT_INSTRUCTIONS, PROMPTS_DIR, SKILLS_DIR, Config
-from mini_agent.guards import GuardError, safe_path, truncate
-from mini_agent.tools import ToolContext, available_skills
+from llamagent import llm
+from llamagent.agent import build_system_prompt, run_turn
+from llamagent.config import MAX_OUTPUT_CHARS, PROJECT_DIR_NAME, PROJECT_INSTRUCTIONS, PROMPTS_DIR, SKILLS_DIR, Config
+from llamagent.guards import GuardError, safe_path, truncate
+from llamagent.tools import ToolContext, available_skills
 
 # ─────────────────────────── Projet (étape 9) ───────────────────────────
 
 
 def project_skills_dirs(workdir: Path) -> list[Path]:
-    """Skills globales (dépôt mini-agent), puis skills du projet, qui l'emportent."""
+    """Skills globales (dépôt llamagent), puis skills du projet, qui l'emportent."""
     return [SKILLS_DIR, workdir / PROJECT_DIR_NAME / "skills"]
 
 

@@ -1,8 +1,8 @@
-"""Point d'entrée de la ligne de commande : `mini-agent`.
+"""Point d'entrée de la ligne de commande : `llamagent`.
 
-    mini-agent                          # mode conversation dans le dossier courant
-    mini-agent "corrige le bug..."      # une seule demande, puis on quitte
-    mini-agent -m qwen3.5:9b -t 0.5     # options : voir mini-agent --help
+    llamagent                          # mode conversation dans le dossier courant
+    llamagent "corrige le bug..."      # une seule demande, puis on quitte
+    llamagent -m qwen3.5:9b -t 0.5     # options : voir llamagent --help
 
 C'est ici qu'on assemble le harness : configuration, session (prompt
 système, outils, garde-fous), commandes /..., puis la boucle agentique.
@@ -11,26 +11,28 @@ Tout l'affichage passe par ui.py (étape 17).
 
 import argparse
 import os
+from importlib.metadata import version
 
 import requests
 
-from mini_agent import ui
-from mini_agent.commands import execute_command
-from mini_agent.config import PROJECT_DIR_NAME, load_config
-from mini_agent.context import compact, needs_compaction
-from mini_agent.history import find_session, resume_session, save_session
-from mini_agent.session import Session, create_session, find_mentions, load_project_instructions
-from mini_agent.tools import available_skills
+from llamagent import ui
+from llamagent.commands import execute_command
+from llamagent.config import PROJECT_DIR_NAME, load_config
+from llamagent.context import compact, needs_compaction
+from llamagent.history import find_session, resume_session, save_session
+from llamagent.session import Session, create_session, find_mentions, load_project_instructions
+from llamagent.tools import available_skills
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(prog="mini-agent", description="Un agent de code minimal autour d'Ollama.")
+    parser = argparse.ArgumentParser(prog="llamagent", description="Un agent de code minimal autour d'Ollama.")
     parser.add_argument("demande", nargs="*", help="demande à traiter avant de quitter (sinon : mode conversation)")
     parser.add_argument("-m", "--model", help="modèle Ollama, ex. qwen3.5:4b")
     parser.add_argument("-t", "--temperature", type=float, help="température, ex. 0.2")
     parser.add_argument("--num-ctx", type=int, help="taille du contexte en tokens, ex. 8192")
     parser.add_argument("--url", help="adresse du serveur Ollama")
     parser.add_argument("-c", "--continue", dest="resume", action="store_true", help="reprendre la dernière conversation du projet")
+    parser.add_argument("--version", action="version", version=f"llamagent {version('llamagent')}")
     return parser.parse_args(argv)
 
 

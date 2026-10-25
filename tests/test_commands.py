@@ -2,10 +2,10 @@
 
 import pytest
 
-from mini_agent import llm
-from mini_agent.commands import COMMANDS, execute_command
-from mini_agent.config import Config
-from mini_agent.session import create_session
+from llamagent import llm
+from llamagent.commands import COMMANDS, execute_command
+from llamagent.config import Config
+from llamagent.session import create_session
 
 
 @pytest.fixture
@@ -69,14 +69,14 @@ def test_allow(session):
 
 
 def test_init_cree_les_fichiers_du_projet(session, tmp_path):
-    from mini_agent.config import read_toml
-    from mini_agent.tools import available_skills
+    from llamagent.config import read_toml
+    from llamagent.tools import available_skills
 
     resultat = execute_command(session, "/init")
     assert resultat.startswith("Créé :")
     assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8").startswith("# Instructions du projet")
-    assert read_toml(tmp_path / ".mini-agent" / "config.toml") == {}  # tout est en commentaire
-    assert (tmp_path / ".mini-agent" / "skills" / "LISEZMOI.txt").exists()
+    assert read_toml(tmp_path / ".llamagent" / "config.toml") == {}  # tout est en commentaire
+    assert (tmp_path / ".llamagent" / "skills" / "LISEZMOI.txt").exists()
     # Le LISEZMOI n'est pas une skill, et AGENTS.md est déjà dans le prompt système.
     assert "LISEZMOI" not in available_skills(session.ctx.skills_dirs)
     assert "## Instructions du projet (AGENTS.md)" in session.messages[0]["content"]
@@ -97,7 +97,7 @@ def test_init_refuse_par_l_utilisateur(session, tmp_path):
 
 
 def test_sessions_reprise_et_suppression(session, tmp_path):
-    from mini_agent.history import save_session
+    from llamagent.history import save_session
 
     assert execute_command(session, "/sessions") == "Aucune conversation sauvegardée dans ce projet."
     session.messages.append({"role": "user", "content": "Corrige le bug"})
@@ -124,7 +124,7 @@ def test_context_et_compact(session, monkeypatch):
     session.messages.append({"role": "user", "content": "Bonjour"})
     assert execute_command(session, "/compact").endswith("Résumé.")
     # Le fichier sauvegardé contient la conversation compactée.
-    from mini_agent.history import find_session
+    from llamagent.history import find_session
     saved = find_session(session.config.workdir, "1")
     assert "Résumé." in saved["messages"][0]["content"]
     assert saved["title"] == "Bonjour"  # le titre ne change pas après un compactage
@@ -132,4 +132,4 @@ def test_context_et_compact(session, monkeypatch):
 
 def test_init_cree_un_gitignore_pour_les_sessions(session, tmp_path):
     execute_command(session, "/init")
-    assert (tmp_path / ".mini-agent" / ".gitignore").read_text(encoding="utf-8") == "sessions/\n"
+    assert (tmp_path / ".llamagent" / ".gitignore").read_text(encoding="utf-8") == "sessions/\n"

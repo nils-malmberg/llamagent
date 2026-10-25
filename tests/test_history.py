@@ -4,9 +4,9 @@ import json
 
 import pytest
 
-from mini_agent.config import Config
-from mini_agent.history import delete_session, find_session, list_sessions, resume_session, save_session, sessions_dir
-from mini_agent.session import create_session
+from llamagent.config import Config
+from llamagent.history import delete_session, find_session, list_sessions, resume_session, save_session, sessions_dir
+from llamagent.session import create_session
 
 
 @pytest.fixture

@@ -1,11 +1,11 @@
 """Essai rapide de l'étape 5, à lancer depuis la racine du projet :
     uv run python try_step5.py
 """
-from mini_agent import llm
-from mini_agent.agent import run_turn
-from mini_agent.config import SKILLS_DIR, load_config
-from mini_agent.guards import ask_confirmation
-from mini_agent.tools import ToolContext
+from llamagent import llm
+from llamagent.agent import run_turn
+from llamagent.config import SKILLS_DIR, load_config
+from llamagent.guards import ask_confirmation
+from llamagent.tools import ToolContext
 
 config = load_config()
 ctx = ToolContext(

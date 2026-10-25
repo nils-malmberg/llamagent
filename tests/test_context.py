@@ -2,10 +2,10 @@
 
 import pytest
 
-from mini_agent import llm
-from mini_agent.config import Config
-from mini_agent.context import compact, context_report, estimate_tokens, needs_compaction, transcript
-from mini_agent.session import create_session
+from llamagent import llm
+from llamagent.config import Config
+from llamagent.context import compact, context_report, estimate_tokens, needs_compaction, transcript
+from llamagent.session import create_session
 
 
 @pytest.fixture

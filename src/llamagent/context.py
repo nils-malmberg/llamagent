@@ -11,10 +11,10 @@ résumé. Le prompt système, lui, est gardé tel quel.
 
 import json
 
-from mini_agent import llm
-from mini_agent.config import COMPACT_THRESHOLD, PROMPTS_DIR
-from mini_agent.guards import truncate
-from mini_agent.tools import tool_schemas
+from llamagent import llm
+from llamagent.config import COMPACT_THRESHOLD, PROMPTS_DIR
+from llamagent.guards import truncate
+from llamagent.tools import tool_schemas
 
 # Approximation : environ 4 caractères par token, en français comme en code.
 # Ce n'est qu'une estimation ; la vraie mesure vient d'Ollama.
