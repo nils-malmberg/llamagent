@@ -11,8 +11,10 @@ from typing import Callable
 import requests
 
 from mini_agent import llm
+from mini_agent.context import compact, context_report
 from mini_agent.config import PROJECT_DIR_NAME, PROJECT_INSTRUCTIONS
 from mini_agent.guards import SHELL_OPERATORS, GuardError
+from mini_agent.history import delete_session, find_session, list_sessions, resume_session, save_session
 from mini_agent.session import Session
 from mini_agent.tools import available_skills, load_skill
 
@@ -39,6 +41,9 @@ INIT_FILES = {
 # num_ctx = 8192
 # allowed_commands = ["python -m pytest", "git status", "git diff"]
 """,
+    # Les conversations sauvegardées contiennent le contenu des fichiers lus :
+    # elles ne doivent pas finir dans le dépôt git du projet.
+    f"{PROJECT_DIR_NAME}/.gitignore": "sessions/\n",
     f"{PROJECT_DIR_NAME}/skills/LISEZMOI.txt": """Skills de ce projet : un fichier .md par skill, par exemple deployer.md.
 
 Format :
@@ -155,6 +160,53 @@ def cmd_clear(session: Session, arg: str) -> str:
     return "Conversation effacée. Prompt système, skills et AGENTS.md relus."
 
 
+def cmd_sessions(session: Session, arg: str) -> str:
+    sessions = list_sessions(session.config.workdir)
+    if not sessions:
+        return "Aucune conversation sauvegardée dans ce projet."
+    lines = []
+    for number, data in enumerate(sessions, start=1):
+        current = "*" if data["id"] == session.session_id else " "
+        date = data.get("updated", "?").replace("T", " ")[:16]
+        lines.append(f"{current}{number:>3}. {date}  {len(data.get('messages', [])):>3} messages  {data.get('title', '')}")
+    return "\n".join(lines + ["", "/resume <numéro> pour reprendre, /delete <numéro> pour supprimer."])
+
+
+def cmd_resume(session: Session, arg: str) -> str:
+    # Sans argument : la conversation la plus récente.
+    data = find_session(session.config.workdir, arg or "1")
+    if data is None:
+        return f"Conversation introuvable : {arg}. Tape /sessions pour la liste."
+    resume_session(session, data)
+    return f"Conversation reprise : {data.get('title', '')} ({len(data['messages'])} messages)."
+
+
+def cmd_delete(session: Session, arg: str) -> str:
+    if not arg:
+        return "Usage : /delete <numéro> (voir /sessions)"
+    data = find_session(session.config.workdir, arg)
+    if data is None:
+        return f"Conversation introuvable : {arg}. Tape /sessions pour la liste."
+    if not session.ctx.confirm(f"Supprimer la conversation « {data.get('title', '')} » ?"):
+        return "Rien n'a été supprimé."
+    delete_session(data)
+    if data["id"] == session.session_id:
+        session.session_id = None  # la conversation en cours sera sauvegardée dans un nouveau fichier
+    return f"Conversation supprimée : {data.get('title', '')}"
+
+
+def cmd_context(session: Session, arg: str) -> str:
+    return context_report(session)
+
+
+def cmd_compact(session: Session, arg: str) -> str:
+    if len(session.messages) <= 1:
+        return "Rien à compacter : la conversation est vide."
+    summary = compact(session)
+    save_session(session)  # le fichier sauvegardé contient désormais le résumé
+    return f"Conversation compactée. Le modèle repart de ce résumé :\n\n{summary}"
+
+
 def cmd_allow(session: Session, arg: str) -> str:
     allowed = session.ctx.allowed_commands
     if not arg:
@@ -177,6 +229,11 @@ COMMANDS: dict[str, tuple[Callable[[Session, str], str], str]] = {
     "/skills": (cmd_skills, "skills disponibles"),
     "/skill": (cmd_skill, "charger une skill : /skill corriger-un-bug"),
     "/clear": (cmd_clear, "effacer la conversation"),
+    "/context": (cmd_context, "ce qui occupe le contexte"),
+    "/compact": (cmd_compact, "résumer la conversation pour libérer du contexte"),
+    "/sessions": (cmd_sessions, "conversations sauvegardées dans ce projet"),
+    "/resume": (cmd_resume, "reprendre une conversation : /resume 2 (sans numéro : la dernière)"),
+    "/delete": (cmd_delete, "supprimer une conversation : /delete 2"),
     "/allow": (cmd_allow, "lancer une commande sans confirmation : /allow python -m pytest"),
 }
 

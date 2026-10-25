@@ -16,7 +16,9 @@ import requests
 from mini_agent.agent import GREY, RED, YELLOW, color
 from mini_agent.commands import execute_command
 from mini_agent.config import load_config
+from mini_agent.context import compact, needs_compaction
 from mini_agent.guards import ask_confirmation
+from mini_agent.history import find_session, resume_session, save_session
 from mini_agent.session import Session, create_session, find_mentions, load_project_instructions
 
 
@@ -27,15 +29,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("-t", "--temperature", type=float, help="température, ex. 0.2")
     parser.add_argument("--num-ctx", type=int, help="taille du contexte en tokens, ex. 8192")
     parser.add_argument("--url", help="adresse du serveur Ollama")
+    parser.add_argument("-c", "--continue", dest="resume", action="store_true", help="reprendre la dernière conversation du projet")
     return parser.parse_args(argv)
 
 
 def context_status(session: Session) -> str:
     """Une ligne qui montre la place occupée dans le contexte du modèle."""
     used, size = session.context_tokens, session.config.num_ctx
-    text = f"[contexte : {used} / {size} tokens]"
+    text = f"[contexte : {'≈ ' if session.context_estimated else ''}{used} / {size} tokens]"
     if used >= size:
-        return color(text + " plein : Ollama a coupé le début de la conversation, tape /clear", RED)
+        return color(text + " plein : Ollama a coupé le début de la conversation", RED)
     if used >= 0.75 * size:
         return color(text + " presque plein", YELLOW)
     return color(text, GREY)
@@ -52,6 +55,16 @@ def handle_request(session: Session, text: str) -> None:
         return
     print(f"\nagent > {answer}")
     print(context_status(session))
+    # Étape 16 : entre deux demandes, on compacte si le contexte est presque plein.
+    if needs_compaction(session):
+        print(color("Contexte presque plein : compactage automatique de la conversation...", YELLOW))
+        try:
+            compact(session)
+            print(context_status(session))
+        except requests.RequestException as error:
+            print(f"Compactage impossible : {error}")
+    # Étape 15 : la conversation est sauvegardée après chaque demande.
+    save_session(session)
 
 
 def main() -> None:
@@ -66,6 +79,13 @@ def main() -> None:
     print(f"Dossier de travail : {config.workdir}")
     if load_project_instructions(config.workdir):
         print("Instructions du projet : AGENTS.md")
+    if args.resume:
+        data = find_session(config.workdir, "1")
+        if data is None:
+            print("Aucune conversation à reprendre dans ce projet : nouvelle conversation.")
+        else:
+            resume_session(session, data)
+            print(f"Conversation reprise : {data.get('title', '')} ({len(data['messages'])} messages)")
 
     try:
         # Mode « une seule demande » : la demande est passée en argument.

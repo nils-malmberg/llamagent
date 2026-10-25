@@ -38,6 +38,7 @@ cd chemin/vers/mon-projet
 mini-agent                                   # mode conversation
 mini-agent "Trouve le bug dans @calc.py"     # une seule demande, puis on quitte
 mini-agent -m qwen3.5:9b -t 0.5              # choisir le modèle et la température
+mini-agent -c                                # reprendre la dernière conversation du projet
 mini-agent --help
 ```
 
@@ -56,6 +57,11 @@ Le dossier depuis lequel on lance `mini-agent` devient le dossier de travail.
 | `/ctx 16384` | changer la taille du contexte |
 | `/skills` | skills disponibles |
 | `/skill corriger-un-bug` | charger une skill dans la conversation |
+| `/context` | ce qui occupe le contexte |
+| `/compact` | résumer la conversation pour libérer du contexte (automatique à 80 %) |
+| `/sessions` | conversations sauvegardées dans ce projet |
+| `/resume 2` | reprendre une conversation (sans numéro : la dernière) |
+| `/delete 2` | supprimer une conversation |
 | `/allow python -m pytest` | lancer une commande sans confirmation pour la session |
 | `/clear` | effacer la conversation |
 | `/quit` | quitter |
@@ -117,12 +123,16 @@ mini-agent/
 │   ├── config.py      # configuration et limites des garde-fous
 │   ├── llm.py         # appels à Ollama (/api/chat, /api/tags)
 │   ├── tools.py       # outils et registre
+│   ├── context.py     # gestion du contexte d'une session
 │   ├── guards.py      # garde-fous
+│   ├── history.py     # gestion des sauvegardes des sessions
 │   ├── agent.py       # boucle agentique et prompt système
 │   ├── session.py     # état de la conversation, fichiers tagués
 │   ├── commands.py    # commandes /...
 │   └── cli.py         # point d'entrée `mini-agent`
-├── prompts/AGENT.md   # prompt système
+├── prompts/           # prompt système
+│   ├── AGENT.md       # rôle de mini-agent
+│   ├── COMPACT.md     # compactage des sessions
 ├── skills/            # skills globales
 ├── demo/stats.py      # script buggé pour la démo
 └── tests/             # pytest, Ollama remplacé par un faux modèle

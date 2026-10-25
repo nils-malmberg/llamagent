@@ -31,6 +31,8 @@ REQUEST_TIMEOUT = 120
 MAX_TOURS = 15  # nombre maximal d'appels au LLM pour une même demande
 COMMAND_TIMEOUT = 30  # durée maximale d'une commande lancée par run_command (s)
 MAX_OUTPUT_CHARS = 4000  # taille maximale d'un résultat d'outil (~1000 tokens)
+# Compactage automatique quand le contexte est rempli à 80 % (étape 16).
+COMPACT_THRESHOLD = 0.8
 
 # Dossiers du projet mini-agent : prompts/ et skills/ sont à la racine du
 # dépôt, deux niveaux au-dessus de ce fichier (src/mini_agent/config.py).

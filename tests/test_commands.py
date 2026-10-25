@@ -94,3 +94,42 @@ def test_init_refuse_par_l_utilisateur(session, tmp_path):
     session.ctx.confirm = lambda question: False
     assert execute_command(session, "/init") == "Rien n'a été créé."
     assert not (tmp_path / "AGENTS.md").exists()
+
+
+def test_sessions_reprise_et_suppression(session, tmp_path):
+    from mini_agent.history import save_session
+
+    assert execute_command(session, "/sessions") == "Aucune conversation sauvegardée dans ce projet."
+    session.messages.append({"role": "user", "content": "Corrige le bug"})
+    save_session(session)
+    assert "Corrige le bug" in execute_command(session, "/sessions")
+
+    execute_command(session, "/clear")
+    assert execute_command(session, "/resume").startswith("Conversation reprise : Corrige le bug")
+    assert session.messages[-1]["content"] == "Corrige le bug"
+    assert "introuvable" in execute_command(session, "/resume 9")
+
+    session.ctx.confirm = lambda question: False
+    assert execute_command(session, "/delete 1") == "Rien n'a été supprimé."
+    session.ctx.confirm = lambda question: True
+    assert execute_command(session, "/delete 1").startswith("Conversation supprimée")
+    assert session.session_id is None
+    assert execute_command(session, "/sessions") == "Aucune conversation sauvegardée dans ce projet."
+
+
+def test_context_et_compact(session, monkeypatch):
+    assert "total estimé" in execute_command(session, "/context")
+    assert execute_command(session, "/compact") == "Rien à compacter : la conversation est vide."
+    monkeypatch.setattr(llm, "chat", lambda config, messages, tools=None: {"role": "assistant", "content": "Résumé."})
+    session.messages.append({"role": "user", "content": "Bonjour"})
+    assert execute_command(session, "/compact").endswith("Résumé.")
+    # Le fichier sauvegardé contient la conversation compactée.
+    from mini_agent.history import find_session
+    saved = find_session(session.config.workdir, "1")
+    assert "Résumé." in saved["messages"][0]["content"]
+    assert saved["title"] == "Bonjour"  # le titre ne change pas après un compactage
+
+
+def test_init_cree_un_gitignore_pour_les_sessions(session, tmp_path):
+    execute_command(session, "/init")
+    assert (tmp_path / ".mini-agent" / ".gitignore").read_text(encoding="utf-8") == "sessions/\n"

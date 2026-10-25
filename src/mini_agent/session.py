@@ -68,6 +68,8 @@ def expand_mentions(text: str, workdir: Path) -> str:
 
 # ─────────────────────────── La session ───────────────────────────
 
+TITLE_LENGTH = 60  # longueur maximale du titre d'une sauvegarde (étape 15)
+
 
 @dataclass
 class Session:
@@ -78,6 +80,9 @@ class Session:
     ctx: ToolContext
     messages: list[dict] = field(default_factory=list)
     context_tokens: int = 0  # taille du dernier échange, d'après Ollama
+    context_estimated: bool = False  # vrai si context_tokens est une estimation (étape 16)
+    session_id: str | None = None  # nom du fichier de sauvegarde (étape 15)
+    title: str = ""  # titre de la sauvegarde : début de la première demande
 
     def __post_init__(self) -> None:
         self.reset()
@@ -92,6 +97,19 @@ class Session:
         une skill ou un AGENTS.md modifié est pris en compte."""
         self.messages = [{"role": "system", "content": self.system_prompt()}]
         self.context_tokens = 0
+        # Nouvelle conversation : elle sera sauvegardée dans un nouveau fichier.
+        self.session_id = None
+        self.title = ""
+
+    def remember_title(self) -> None:
+        """Retient le début de la première demande comme titre (étape 15).
+
+        Le titre est fixé une fois pour toutes : après un compactage, la
+        première demande a disparu, mais le titre reste le même.
+        """
+        if not self.title:
+            first = next((m["content"] for m in self.messages if m["role"] == "user"), "")
+            self.title = first.splitlines()[0][:TITLE_LENGTH] if first else ""
 
     def update(self, **changes) -> None:
         """Change un réglage (modèle, température...) en gardant la conversation."""
@@ -103,6 +121,7 @@ class Session:
         data = llm.chat_full(self.config, messages, tools)
         # Tokens lus + tokens générés : la place occupée dans le contexte.
         self.context_tokens = data.get("prompt_eval_count", 0) + data.get("eval_count", 0)
+        self.context_estimated = False
         return data["message"]
 
     def ask(self, text: str) -> str:
