@@ -1,0 +1,19 @@
+[project]
+name = "mini-agent"
+version = "0.1.0"
+description = "A small agent used to fix some code."
+readme = "README.md"
+authors = [
+    { name = "Nils Malmberg" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+mini-agent = "mini_agent.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
