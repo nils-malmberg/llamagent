@@ -9,7 +9,7 @@ Cette fois, on exécute les outils demandés et on renvoie leur résultat :
 
 Lancer (depuis la racine du projet) :
     uv run python steps/step4_loop.py
-    uv run python steps/step4_loop.py "Lis README.md et résume-le en 3 points."
+    uv run python steps/step4_loop.py "Lis le pyproject.toml et donne les dépendances."
 """
 
 import os
