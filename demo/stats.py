@@ -6,7 +6,7 @@ Il contient un bug volontaire : c'est la démo de mini-agent.
 
 def moyenne(notes: list[float]) -> float:
     total = 0
-    for i in range(len(notes)):
+    for i in range(1, len(notes)):
         total += notes[i]
     return total / len(notes)
 
