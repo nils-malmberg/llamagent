@@ -4,7 +4,7 @@ Un agent de code minimal en Python, écrit à la main pour comprendre comment fo
 
 Il pilote un LLM local servi par [Ollama](https://ollama.com) (par défaut `qwen3.5:4b`) via l'API native `/api/chat`. Aucun framework d'agent : une seule dépendance, `requests`.
 
-![Interface de llamagent : la mascotte, puis chaque tour de la boucle avec le modèle, le harness et l'outil](https://raw.githubusercontent.com/nils-malmberg/llamagent/main/docs/interface.png)
+![Interface de llamagent : la mascotte, puis chaque tour de la boucle avec le modèle, le harness et l'outil](https://nils-malmberg.fr/media/projets/project8/interface.png)
 
 📖 Tutoriel complet, étape par étape : [nils-malmberg.fr/project8.html](https://nils-malmberg.fr/project8.html)
 
