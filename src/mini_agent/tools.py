@@ -34,6 +34,9 @@ class ToolContext:
     command_timeout: int = COMMAND_TIMEOUT
 
 
+# ─────────────────────────── Les outils ───────────────────────────
+
+
 def read_file(ctx: ToolContext, path: str) -> str:
     """Renvoie le contenu d'un fichier texte du dossier de travail."""
     return safe_path(ctx.workdir, path).read_text(encoding="utf-8")
@@ -113,6 +116,47 @@ def run_command(ctx: ToolContext, command: str) -> str:
     )
 
 
+def load_skill(ctx: ToolContext, name: str) -> str:
+    """Renvoie le contenu d'une skill (fichier Markdown de skills/)."""
+    skills = available_skills(ctx.skills_dir)
+    # On vérifie le nom dans la liste : impossible de lire un autre fichier.
+    if name not in skills:
+        raise GuardError(f"skill inconnue '{name}'. Skills disponibles : {', '.join(skills) or 'aucune'}.")
+    return (ctx.skills_dir / f"{name}.md").read_text(encoding="utf-8")
+
+
+# ─────────────────────────── Skills ───────────────────────────
+
+
+def read_skill_description(path: Path) -> str:
+    """Lit la ligne `description:` de l'en-tête d'une skill.
+
+    Une skill commence par un petit en-tête entre deux lignes "---" :
+        ---
+        description: Écrire des tests pytest pour du code Python.
+        ---
+    """
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if lines and lines[0].strip() == "---":
+        for line in lines[1:]:
+            if line.strip() == "---":
+                break
+            key, _, value = line.partition(":")
+            if key.strip() == "description":
+                return value.strip()
+    return "(pas de description)"
+
+
+def available_skills(skills_dir: Path) -> dict[str, str]:
+    """Renvoie {nom de la skill: description} pour chaque fichier .md."""
+    if not skills_dir.is_dir():
+        return {}
+    return {p.stem: read_skill_description(p) for p in sorted(skills_dir.glob("*.md"))}
+
+
+# ─────────────────────────── Le registre ───────────────────────────
+
+
 def schema(name: str, description: str, properties: dict, required: list[str]) -> dict:
     """Construit le schéma d'un outil au format attendu par Ollama."""
     return {
@@ -126,7 +170,6 @@ def schema(name: str, description: str, properties: dict, required: list[str]) -
 
 
 PATH_PARAM = {"type": "string", "description": "Chemin relatif au dossier de travail, ex. 'src/main.py'."}
-
 
 # nom de l'outil -> (fonction Python, schéma envoyé au modèle)
 TOOLS: dict[str, tuple[Callable[..., str], dict]] = {
@@ -161,6 +204,15 @@ TOOLS: dict[str, tuple[Callable[..., str], dict]] = {
             ["command"],
         ),
     ),
+    "load_skill": (
+        load_skill,
+        schema(
+            "load_skill",
+            "Charge les instructions d'une skill listée dans le prompt système.",
+            {"name": {"type": "string", "description": "Nom exact de la skill, ex. 'corriger-un-bug'."}},
+            ["name"],
+        ),
+    ),
 }
 
 
@@ -169,7 +221,37 @@ def tool_schemas() -> list[dict]:
     return [tool_schema for _, tool_schema in TOOLS.values()]
 
 
-def execute_tool(name: str, arguments: dict, ctx: ToolContext) -> str:
-    """Version simple de l'étape 5 (l'étape 8 y ajoute la gestion des erreurs)."""
-    function, _ = TOOLS[name]
-    return function(ctx, **arguments)
+def execute_tool(name: str, arguments, ctx: ToolContext) -> str:
+    """Exécute un outil demandé par le modèle et renvoie toujours un texte.
+
+    Aucune erreur ne doit faire planter l'agent : chaque problème est
+    décrit dans le texte renvoyé, pour que le modèle puisse se corriger.
+    """
+    if name not in TOOLS:
+        return f"Erreur : outil inconnu '{name}'. Outils valides : {', '.join(TOOLS)}."
+    function, tool_schema = TOOLS[name]
+
+    # Certains modèles renvoient les arguments sous forme de texte JSON.
+    if isinstance(arguments, str):
+        try:
+            arguments = json.loads(arguments or "{}")
+        except json.JSONDecodeError:
+            return f"Erreur : les arguments de {name} ne sont pas du JSON valide : {arguments}"
+    if not isinstance(arguments, dict):
+        return f"Erreur : les arguments de {name} doivent être un objet JSON."
+
+    parameters = tool_schema["function"]["parameters"]
+    expected = ", ".join(parameters["properties"])
+    missing = [p for p in parameters["required"] if p not in arguments]
+    if missing:
+        return f"Erreur : argument manquant pour {name} : {', '.join(missing)}. Paramètres attendus : {expected}."
+    unknown = [p for p in arguments if p not in parameters["properties"]]
+    if unknown:
+        return f"Erreur : argument inconnu pour {name} : {', '.join(unknown)}. Paramètres attendus : {expected}."
+
+    try:
+        return function(ctx, **arguments)
+    except GuardError as error:
+        return f"Refusé : {error}"
+    except Exception as error:  # toute autre exception Python
+        return f"Erreur pendant {name} : {type(error).__name__}: {error}"

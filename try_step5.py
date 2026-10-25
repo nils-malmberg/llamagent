@@ -4,13 +4,14 @@
 from mini_agent import llm
 from mini_agent.agent import run_turn
 from mini_agent.config import SKILLS_DIR, load_config
+from mini_agent.guards import ask_confirmation
 from mini_agent.tools import ToolContext
 
 config = load_config()
 ctx = ToolContext(
-    workdir=config.workdir,
-    skills_dir=SKILLS_DIR,
-    confirm=lambda question: input(f"{question} [o/N] ") == "o",
+    workdir=config.workdir, 
+    skills_dir=SKILLS_DIR, 
+    confirm=ask_confirmation
 )
 messages = [{"role": "user", "content": "Liste les fichiers du projet, puis lis pyproject.toml et donne ses dépendances."}]
 answer = run_turn(lambda msgs, tools: llm.chat(config, msgs, tools), messages, ctx)

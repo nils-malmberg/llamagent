@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from mini-agent!")
+"""mini-agent : un agent de code minimal autour d'Ollama."""
